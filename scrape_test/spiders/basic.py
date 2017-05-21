@@ -35,18 +35,18 @@ class BasicSpider(scrapy.Spider):
 
     def parse(self, response):
         self._set_start_url(response)
-        # for now
+
         return self.parse_deal(response)
 
     def parse_deal(self, response):
         # if coupon item,
         if True:
-            # todo: get the deal id
+            # todo: get the real deal id
             deal_id = "201892"
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
             request.meta["old_response_body"] = response.body
-            # request.meta["start_url"] = response.meta["start_url"]
+            request.meta["start_url"] = response.meta["start_url"]
             request.meta["prev_url"] = response.url
             yield request
         else:
@@ -60,7 +60,7 @@ class BasicSpider(scrapy.Spider):
         loader = DealLoader(item=Deal(), selector=old_response)
 
         # load common data
-        self.add_common_data_to_loader(loader, None) # todo: add back later response.meta["start_url"])
+        self.add_common_data_to_loader(loader, response.meta["start_url"])
 
         prev_url = response.meta["prev_url"]
         loader.add_value('page_url', prev_url)
@@ -83,7 +83,6 @@ class BasicSpider(scrapy.Spider):
         return loader.load_item()
 
     def parse_regular_deal(self, response):
-
         loader = DealLoader(item=Deal(), response=response)
 
         # load common data
@@ -116,7 +115,8 @@ class BasicSpider(scrapy.Spider):
         loader.add_xpath("address", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[2]//text()')
 
         category_urls = loader.selector.xpath('//a[@rel="category tag"]/@href').extract()
-        # todo: activate later category_urls.append(start_url)
+        # insert the start url as well, the category url section is sometimes empty
+        category_urls.append(start_url)
         loader.add_value("categories", category_urls, list_strip, urls_to_categories)
 
     def _set_start_url(self, response):
