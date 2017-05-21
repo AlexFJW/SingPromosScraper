@@ -36,11 +36,11 @@ class BasicSpider(scrapy.Spider):
         # todo: do url fixing
         # todo: swap to string(...) rather than ../text(), to prevent <em> problems
 
-        l.add_value('url', response.url)
+        l.add_value('page_url', response.url)
         l.add_value('project', self.settings.get('BOT_NAME'))
         l.add_value('spider', self.name)
         l.add_value('server', socket.gethostname())
-        l.add_value('date', datetime.datetime.now())
+        l.add_value('date_retrieved', datetime.datetime.now())
 
         return l.load_item()
 

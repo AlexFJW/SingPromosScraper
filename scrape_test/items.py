@@ -30,5 +30,6 @@ class DealPage(Item):
     page_url = Field()
     project = Field()
     spider = Field()
+    server = Field()
     date_retrieved = Field()
 
