@@ -31,21 +31,22 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = ['http://singpromos.com/warehouse-sales/philips-carnival-sale-returns-from-19-21-may-2017-201297/']
+    start_urls = ['http://singpromos.com/department-stores/guardian-online-store-20-off-storewide-discount-coupon-code-no-min-spend-valid-from-18-21-may-2017-201892/']
 
     def parse(self, response):
+        self._set_start_url(response)
         # for now
         return self.parse_deal(response)
 
     def parse_deal(self, response):
         # if coupon item,
-        if False:
+        if True:
             # todo: get the deal id
-            deal_id = "123"
+            deal_id = "201892"
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
             request.meta["old_response_body"] = response.body
-            request.meta["start_url"] = response.meta["start_url"]
+            # request.meta["start_url"] = response.meta["start_url"]
             request.meta["prev_url"] = response.url
             yield request
         else:
@@ -55,36 +56,45 @@ class BasicSpider(scrapy.Spider):
         Reuse the previous response body to populate DealItem fields
     '''
     def parse_coupon_deal(self, response):
-        # todo: change when doing multipage scraping
-        self._set_start_url(response)
-
         old_response = Selector(text=response.meta["old_response_body"])
         loader = DealLoader(item=Deal(), selector=old_response)
-        self.add_common_data_to_loader(loader, response.meta["start_url"])
-        loader.add_value('page_url', response.meta["prev_url"])
 
-        coupon_code = json.loads(response.body)[0]
-        html_content = self._get_html_content(response)
-        # todo: strip the click me box, and the text saying "show up here, replace with the code"
+        # load common data
+        self.add_common_data_to_loader(loader, None) # todo: add back later response.meta["start_url"])
+
+        prev_url = response.meta["prev_url"]
+        loader.add_value('page_url', prev_url)
+
+        # read the coupon code
+        str_response = str(response.body, 'utf-8')
+        json_result = json.loads(str_response)
+        coupon_code = json_result[0] if (len(json_result) > 0) else ""
+
+        # read & modify the html content
+        html_content = self._get_html_content(old_response, True)
+        html_content = html_content.replace("(click box above to reveal)", coupon_code)
         loader.add_value("html_content", html_content)
 
-        def make_url(i): return urllib.parse.urljoin(response.url, i)
+        # save images
+        def make_url(i): return urllib.parse.urljoin(prev_url, i)
         image_urls = Selector(text=html_content).xpath('//a/img/../@href').extract()
         loader.add_value("image_urls", image_urls, MapCompose(make_url))
 
         return loader.load_item()
 
     def parse_regular_deal(self, response):
-        # todo: change when doing multipage scraping
-        self._set_start_url(response)
 
         loader = DealLoader(item=Deal(), response=response)
+
+        # load common data
         self.add_common_data_to_loader(loader, response.meta["start_url"])
         loader.add_value('page_url', response.url)
 
-        html_content = self._get_html_content(response)
+        # load html content
+        html_content = self._get_html_content(response, False)
         loader.add_value("html_content", html_content)
 
+        # load images
         def make_url(i): return urllib.parse.urljoin(response.url, i)
         image_urls = Selector(text=html_content).xpath('//a/img/../@href').extract()
         loader.add_value("image_urls", image_urls, MapCompose(make_url))
@@ -106,14 +116,14 @@ class BasicSpider(scrapy.Spider):
         loader.add_xpath("address", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[2]//text()')
 
         category_urls = loader.selector.xpath('//a[@rel="category tag"]/@href').extract()
-        category_urls.append(start_url)
+        # todo: activate later category_urls.append(start_url)
         loader.add_value("categories", category_urls, list_strip, urls_to_categories)
 
     def _set_start_url(self, response):
         if not "start_url" in response.meta:
             response.meta["start_url"] = response.url
 
-    def _get_html_content(self, response):
+    def _get_html_content(self, response, isCoupon):
         content_root = response.xpath('.//*[contains(@class, "entry-content")][1]')
 
         def should_start_after_this(element):
@@ -126,11 +136,15 @@ class BasicSpider(scrapy.Spider):
             node_is_target = node_content and "shareOnFacebook" in node_content[0]
             return element.xpath('.//*[@id="shareOnFacebook"]') or node_is_target
 
+        def should_skip(element):
+            return len(element.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
+
         started = False
 
         html_content = ""
         for node in content_root.xpath("./*"):
             if not started and should_start_after_this(node):
+                print("Started!")
                 started = True
                 continue
             elif not started:
@@ -139,6 +153,10 @@ class BasicSpider(scrapy.Spider):
             if should_stop(node):
                 break
 
+            if isCoupon and should_skip(node):
+                print(node.extract())
+                continue
+
             html_content += node.extract()
 
-        return html_content
+        return html_content.replace("/redirect/link?url=", "")
