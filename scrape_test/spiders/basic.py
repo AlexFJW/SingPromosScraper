@@ -19,7 +19,6 @@ from scrape_test.categories import UrlToCategoryMap
 def list_strip(list_):
     return list(map(str.strip, list_))
 
-
 # convert a list of urls to a list of categories
 def urls_to_categories(list_):
     mapped = set()
@@ -32,7 +31,7 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = ['http://singpromos.com/personal-care/70-off-braun-series-5-5040s-mens-electric-foil-wetdry-shaver-24hr-deal-till-20-may-2017-7am-201979/']
+    start_urls = ['http://singpromos.com/warehouse-sales/']
 
     def parse(self, response):
         self._set_start_url(response)
@@ -49,10 +48,8 @@ class BasicSpider(scrapy.Spider):
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
-
     def parse_deal(self, response):
-        # if coupon item,
-        if False:
+        if self.is_coupon_deal_page(response):
             deal_id = re.findall('-(\\d*?)/$', response.url)[-1]
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
@@ -62,6 +59,10 @@ class BasicSpider(scrapy.Spider):
             yield request
         else:
             yield self.parse_regular_deal(response)
+
+    def is_coupon_deal_page(self, response):
+        return len(response.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
+
 
     '''Coupon code result is in json
         Reuse the previous response body to populate DealItem fields
