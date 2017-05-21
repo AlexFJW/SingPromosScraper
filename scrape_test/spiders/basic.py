@@ -2,6 +2,7 @@
 import scrapy
 import time
 import socket
+import logging
 from scrapy.loader import ItemLoader
 from scrapy.selector import Selector
 
@@ -17,7 +18,7 @@ class BasicSpider(scrapy.Spider):
         l = ItemLoader(item=DealPage(), response=response)
         l.add_xpath("title", '//*[@class="entry-title"]/text()')
         l.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
-        l.add_xpath("description", '//*[@class="value-title"][1]/@title')
+        l.add_xpath("description", '//*[@class="hidden description"]//*[@class="value-title"][1]/@title')
         l.add_xpath("deal_start_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[1]/text()')
         l.add_xpath("deal_end_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[2]/text()')
         l.add_xpath("location", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[1]/text()')
