@@ -16,13 +16,13 @@ class BasicSpider(scrapy.Spider):
 
     def parse(self, response):
         l = ItemLoader(item=DealPage(), response=response)
-        l.add_xpath("title", '//*[@class="entry-title"]/text()')
+        l.add_xpath("title", '//*[@class="entry-title"]//text()')
         l.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
         l.add_xpath("description", '//*[@class="hidden description"]//*[@class="value-title"][1]/@title')
-        l.add_xpath("deal_start_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[1]/text()')
-        l.add_xpath("deal_end_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[2]/text()')
-        l.add_xpath("location", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[1]/text()')
-        l.add_xpath("address", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[2]/text()')
+        l.add_xpath("deal_start_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[1]//text()')
+        l.add_xpath("deal_end_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[2]//text()')
+        l.add_xpath("location", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[1]//text()')
+        l.add_xpath("address", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[2]//text()')
 
         html_content = self._get_html_content(response)
         l.add_value("html_content", html_content)
@@ -43,7 +43,6 @@ class BasicSpider(scrapy.Spider):
         l.add_value('time_retrieved_epoch', int(time.time()))
 
         return l.load_item()
-
 
 
     def _get_html_content(self, response):
