@@ -7,7 +7,8 @@
 
 from scrapy.item import Item, Field
 
-class DealPage(Item):
+
+class Deal(Item):
     title = Field()
     preview_image_url = Field()
     html_content = Field()
@@ -23,6 +24,7 @@ class DealPage(Item):
     # initial url which led us to this page
     source_page = Field()
 
+    # should be a human-readable string
     deal_start_date = Field()
     deal_end_date = Field()
 
@@ -31,5 +33,5 @@ class DealPage(Item):
     project = Field()
     spider = Field()
     server = Field()
-    date_retrieved = Field()
+    time_retrieved_epoch = Field()
 
