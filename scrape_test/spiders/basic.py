@@ -3,10 +3,12 @@ import scrapy
 import time
 import socket
 import logging
-from scrapy.loader import ItemLoader
+import urllib.parse
 from scrapy.selector import Selector
+from scrapy.loader.processors import MapCompose
 
 from scrape_test.items import DealPage
+from scrape_test.loaders import DealLoader
 
 
 class BasicSpider(scrapy.Spider):
@@ -15,7 +17,15 @@ class BasicSpider(scrapy.Spider):
     start_urls = ['http://singpromos.com/warehouse-sales/philips-carnival-sale-returns-from-19-21-may-2017-201297/']
 
     def parse(self, response):
-        l = ItemLoader(item=DealPage(), response=response)
+        l = DealLoader(item=DealPage(), response=response)
+
+        # housekeeping
+        l.add_value('page_url', response.url)
+        l.add_value('project', self.settings.get('BOT_NAME'))
+        l.add_value('spider', self.name)
+        l.add_value('server', socket.gethostname())
+        l.add_value('time_retrieved_epoch', int(time.time()))
+
         l.add_xpath("title", '//*[@class="entry-title"]//text()')
         l.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
         l.add_xpath("description", '//*[@class="hidden description"]//*[@class="value-title"][1]/@title')
@@ -28,19 +38,13 @@ class BasicSpider(scrapy.Spider):
         l.add_value("html_content", html_content)
 
         image_urls = Selector(text=html_content).xpath('//a/img/../@href').extract()
-        l.add_value("image_urls", image_urls)
+        make_url = lambda i: urllib.parse.urljoin(response.url, i)
+        l.add_value("image_urls", image_urls, MapCompose(make_url))
 
         # todo: add post processing later
         l.add_xpath("categories", '//a[@rel="category tag"]/@href')
 
         # todo: do url fixing
-        # todo: swap to string(...) rather than ../text(), to prevent <em> problems
-
-        l.add_value('page_url', response.url)
-        l.add_value('project', self.settings.get('BOT_NAME'))
-        l.add_value('spider', self.name)
-        l.add_value('server', socket.gethostname())
-        l.add_value('time_retrieved_epoch', int(time.time()))
 
         return l.load_item()
 
