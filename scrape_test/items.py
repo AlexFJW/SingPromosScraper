@@ -7,7 +7,8 @@
 
 from scrapy.item import Item, Field
 
-class DealPage(Item):
+
+class Deal(Item):
     title = Field()
     preview_image_url = Field()
     html_content = Field()
