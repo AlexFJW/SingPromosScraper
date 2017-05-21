@@ -31,16 +31,27 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = ['http://singpromos.com/department-stores/guardian-online-store-20-off-storewide-discount-coupon-code-no-min-spend-valid-from-18-21-may-2017-201892/']
+    start_urls = ['http://singpromos.com/digital-cameras-dslr/']
 
     def parse(self, response):
         self._set_start_url(response)
 
-        return self.parse_deal(response)
+        deal_urls = response.xpath('.//*[@class="tabs1Content"]//*[contains(@class, "mh-loop-title")]/a/@href').extract()
+        for url in deal_urls:
+            request = Request(url=url, callback=self.parse_deal)
+            request.meta["start_url"] = response.meta["start_url"]
+            yield request
+
+        next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
+        if next_page_url:
+            request = Request(url=next_page_url[0], callback=self.parse)
+            request.meta["start_url"] = response.meta["start_url"]
+            yield request
+
 
     def parse_deal(self, response):
         # if coupon item,
-        if True:
+        if False:
             # todo: get the real deal id
             deal_id = "201892"
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"

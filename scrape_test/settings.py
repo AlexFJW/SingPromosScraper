@@ -13,7 +13,7 @@ BOT_NAME = 'scrape_test'
 
 SPIDER_MODULES = ['scrape_test.spiders']
 NEWSPIDER_MODULE = 'scrape_test.spiders'
-
+CLOSESPIDER_PAGECOUNT = 10
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'scrape_test (+http://www.yourdomain.com)'
