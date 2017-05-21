@@ -2,6 +2,7 @@
 import scrapy
 import time
 import socket
+import re
 import logging
 import json
 import urllib.parse
@@ -31,7 +32,7 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = ['http://singpromos.com/digital-cameras-dslr/']
+    start_urls = ['http://singpromos.com/personal-care/70-off-braun-series-5-5040s-mens-electric-foil-wetdry-shaver-24hr-deal-till-20-may-2017-7am-201979/']
 
     def parse(self, response):
         self._set_start_url(response)
@@ -52,8 +53,7 @@ class BasicSpider(scrapy.Spider):
     def parse_deal(self, response):
         # if coupon item,
         if False:
-            # todo: get the real deal id
-            deal_id = "201892"
+            deal_id = re.findall('-(\\d*?)/$', response.url)[-1]
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
             request.meta["old_response_body"] = response.body
