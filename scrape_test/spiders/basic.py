@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
-import datetime
+import time
 import socket
 from scrapy.loader import ItemLoader
 from scrapy.selector import Selector
@@ -18,7 +18,6 @@ class BasicSpider(scrapy.Spider):
         l.add_xpath("title", '//*[@class="entry-title"]/text()')
         l.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
         l.add_xpath("description", '//*[@class="value-title"][1]/@title')
-        # todo: process dates
         l.add_xpath("deal_start_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[1]/text()')
         l.add_xpath("deal_end_date", '//*[contains(@class, "eventDetailsTable")]//tr[1]/td[2]/text()')
         l.add_xpath("location", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[1]/text()')
@@ -40,7 +39,7 @@ class BasicSpider(scrapy.Spider):
         l.add_value('project', self.settings.get('BOT_NAME'))
         l.add_value('spider', self.name)
         l.add_value('server', socket.gethostname())
-        l.add_value('date_retrieved', datetime.datetime.now())
+        l.add_value('time_retrieved_epoch', int(time.time()))
 
         return l.load_item()
 
