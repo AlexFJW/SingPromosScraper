@@ -5,10 +5,25 @@ import socket
 import logging
 import urllib.parse
 from scrapy.selector import Selector
-from scrapy.loader.processors import MapCompose
+from scrapy.loader.processors import MapCompose, Compose
 
 from scrape_test.items import DealPage
 from scrape_test.loaders import DealLoader
+from scrape_test.categories import UrlToCategoryMap
+
+
+# strips all strings in a list
+def list_strip(list_):
+    return list(map(str.strip, list_))
+
+
+# convert a list of urls to a list of categories
+def urls_to_categories(list_):
+    mapped = set()
+    for url in list_:
+        if url in UrlToCategoryMap:
+            mapped.add(UrlToCategoryMap[url])
+    return mapped
 
 
 class BasicSpider(scrapy.Spider):
@@ -17,6 +32,8 @@ class BasicSpider(scrapy.Spider):
     start_urls = ['http://singpromos.com/warehouse-sales/philips-carnival-sale-returns-from-19-21-may-2017-201297/']
 
     def parse(self, response):
+        self.set_start_url(response)
+
         l = DealLoader(item=DealPage(), response=response)
 
         # housekeeping
@@ -37,30 +54,33 @@ class BasicSpider(scrapy.Spider):
         html_content = self._get_html_content(response)
         l.add_value("html_content", html_content)
 
+        def make_url(i): return urllib.parse.urljoin(response.url, i)
+
         image_urls = Selector(text=html_content).xpath('//a/img/../@href').extract()
-        make_url = lambda i: urllib.parse.urljoin(response.url, i)
         l.add_value("image_urls", image_urls, MapCompose(make_url))
 
-        # todo: add post processing later
-        l.add_xpath("categories", '//a[@rel="category tag"]/@href')
-
-        # todo: do url fixing
+        category_urls = response.xpath('//a[@rel="category tag"]/@href').extract()
+        category_urls.append(response.meta["start_url"])
+        l.add_value("categories", category_urls, list_strip, urls_to_categories)
 
         return l.load_item()
 
+    def set_start_url(self, response):
+        if not "start_url" in response.meta:
+            response.meta["start_url"] = response.url
 
     def _get_html_content(self, response):
         content_root = response.xpath('.//*[contains(@class, "entry-content")][1]')
 
-        def should_start_after_this(node):
-            node_content = node.xpath('@class').extract()
+        def should_start_after_this(element):
+            node_content = element.xpath('@class').extract()
             node_is_target = node_content and "printDontShow" in node_content[0]
-            return node.xpath('.//*[contains(@class, "printDontShow")]') or node_is_target
+            return element.xpath('.//*[contains(@class, "printDontShow")]') or node_is_target
 
-        def should_stop(node):
-            node_content = node.xpath('@id').extract()
+        def should_stop(element):
+            node_content = element.xpath('@id').extract()
             node_is_target = node_content and "shareOnFacebook" in node_content[0]
-            return node.xpath('.//*[@id="shareOnFacebook"]') or node_is_target
+            return element.xpath('.//*[@id="shareOnFacebook"]') or node_is_target
 
         started = False
 
