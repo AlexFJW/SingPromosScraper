@@ -33,7 +33,7 @@ class BasicSpider(scrapy.Spider):
     allowed_domains = ["singpromos.com"]
     start_urls = UrlToCategoryMap.keys()
     # for debugging
-    # start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
+    #start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
 
     # for navigation pages (pages with a list of deals & a pagination bar for more deals)
     def parse(self, response):
@@ -48,7 +48,7 @@ class BasicSpider(scrapy.Spider):
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
-        # handle next navigation page page
+        # handle next navigation page
         next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
         if next_page_url:
             full_url = urllib.parse.urljoin(response.url, next_page_url[0])
@@ -139,9 +139,10 @@ class BasicSpider(scrapy.Spider):
         loader.add_xpath("location", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[1]//text()')
         loader.add_xpath("address", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[2]//text()')
 
-        category_urls = loader.selector.xpath('//a[@rel="category tag"]/@href').extract()
+        # gather category urls from page & convert them to categories
         # insert the start url as well, the category url section is sometimes empty
-        category_urls.append(start_url)
+        category_urls = set(loader.selector.xpath('//a[@rel="category tag"]/@href').extract())
+        category_urls.add(start_url)
         loader.add_value("categories", category_urls, list_strip, urls_to_categories)
 
     def _set_start_url(self, response):
