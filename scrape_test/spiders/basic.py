@@ -31,24 +31,29 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = ['http://singpromos.com/warehouse-sales/']
+    start_urls = UrlToCategoryMap.keys()
+    # for debugging
+    # start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
 
     def parse(self, response):
         self._set_start_url(response)
 
         deal_urls = response.xpath('.//*[@class="tabs1Content"]//*[contains(@class, "mh-loop-title")]/a/@href').extract()
         for url in deal_urls:
-            request = Request(url=url, callback=self.parse_deal)
+            full_url = urllib.parse.urljoin(response.url, url)
+            request = Request(url=full_url, callback=self.parse_deal)
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
         next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
         if next_page_url:
-            request = Request(url=next_page_url[0], callback=self.parse)
+            full_url = urllib.parse.urljoin(response.url, next_page_url[0])
+            request = Request(url=full_url, callback=self.parse)
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
     def parse_deal(self, response):
+        logging.warning("HIHI")
         if self.is_coupon_deal_page(response):
             deal_id = re.findall('-(\\d*?)/$', response.url)[-1]
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
@@ -145,8 +150,8 @@ class BasicSpider(scrapy.Spider):
 
         def should_stop(element):
             node_content = element.xpath('@id').extract()
-            node_is_target = node_content and "shareOnFacebook" in node_content[0]
-            return element.xpath('.//*[@id="shareOnFacebook"]') or node_is_target
+            node_is_target = node_content and "showSharerPopup" in node_content[0]
+            return element.xpath('.//*[@id="showSharerPopup"]') or node_is_target
 
         def should_skip(element):
             return len(element.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
@@ -156,7 +161,6 @@ class BasicSpider(scrapy.Spider):
         html_content = ""
         for node in content_root.xpath("./*"):
             if not started and should_start_after_this(node):
-                print("Started!")
                 started = True
                 continue
             elif not started:
@@ -166,7 +170,6 @@ class BasicSpider(scrapy.Spider):
                 break
 
             if isCoupon and should_skip(node):
-                print(node.extract())
                 continue
 
             html_content += node.extract()
