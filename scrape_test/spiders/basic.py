@@ -31,20 +31,22 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = ['http://singpromos.com/warehouse-sales/']
+    start_urls = UrlToCategoryMap.keys()
 
     def parse(self, response):
         self._set_start_url(response)
 
         deal_urls = response.xpath('.//*[@class="tabs1Content"]//*[contains(@class, "mh-loop-title")]/a/@href').extract()
         for url in deal_urls:
-            request = Request(url=url, callback=self.parse_deal)
+            full_url = urllib.parse.urljoin(response.url, url)
+            request = Request(url=full_url, callback=self.parse_deal)
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
         next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
         if next_page_url:
-            request = Request(url=next_page_url[0], callback=self.parse)
+            full_url = urllib.parse.urljoin(response.url, next_page_url[0])
+            request = Request(url=full_url, callback=self.parse)
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
