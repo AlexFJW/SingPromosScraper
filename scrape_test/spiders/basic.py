@@ -68,8 +68,8 @@ class BasicSpider(scrapy.Spider):
             yield self.parse_regular_deal(response)
 
     @staticmethod
-    def get_deal_id(URL):
-        return re.findall('-(\\d*?)/$', URL)[-1]
+    def get_deal_id(url):
+        return re.findall('-(\\d*?)/$', url)[-1]
 
     def is_coupon_deal_page(self, response):
         return len(response.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
