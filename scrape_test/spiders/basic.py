@@ -31,15 +31,18 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    # start_urls = UrlToCategoryMap.keys()
+    start_urls = UrlToCategoryMap.keys()
     # for debugging
     # start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
     '''start_urls = ['http://singpromos.com/department-stores/guardian-online-store-20-off-storewide-discount-coupon-code'
                  '-no-min-spend-valid-from-18-21-may-2017-201892/']'''
 
+    # for navigation pages (pages with a list of deals & a pagination bar for more deals)
     def parse(self, response):
+        # save the start_url. used to verify the category of each deal
         self._set_start_url(response)
 
+        # handle all deals
         deal_urls = response.xpath('.//*[@class="tabs1Content"]//*[contains(@class, "mh-loop-title")]/a/@href').extract()
         for url in deal_urls:
             full_url = urllib.parse.urljoin(response.url, url)
@@ -47,6 +50,7 @@ class BasicSpider(scrapy.Spider):
             request.meta["start_url"] = response.meta["start_url"]
             yield request
 
+        # handle next navigation page
         next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
         if next_page_url:
             full_url = urllib.parse.urljoin(response.url, next_page_url[0])
@@ -55,11 +59,15 @@ class BasicSpider(scrapy.Spider):
             yield request
 
     def parse_deal(self, response):
-        logging.warning("HIHI")
         if self.is_coupon_deal_page(response):
+            # coupon deal pages retrieve the coupon code through a ajax call
+            # make the ajax call & process the deal page's data at that url
+            # cache this page's response body to do the above
+
             deal_id = self.get_deal_id(response.url)
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
+
             request.meta["old_response_body"] = response.body
             request.meta["start_url"] = response.meta["start_url"]
             request.meta["prev_url"] = response.url
@@ -138,16 +146,17 @@ class BasicSpider(scrapy.Spider):
         loader.add_xpath("location", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[1]//text()')
         loader.add_xpath("address", '//*[contains(@class, "eventDetailsTable")]//tr[2]/td[2]//text()')
 
-        category_urls = loader.selector.xpath('//a[@rel="category tag"]/@href').extract()
+        # gather category urls from page & convert them to categories
         # insert the start url as well, the category url section is sometimes empty
-        category_urls.append(start_url)
+        category_urls = set(loader.selector.xpath('//a[@rel="category tag"]/@href').extract())
+        category_urls.add(start_url)
         loader.add_value("categories", category_urls, list_strip, urls_to_categories)
 
     def _set_start_url(self, response):
         if not "start_url" in response.meta:
             response.meta["start_url"] = response.url
 
-    def _get_html_content(self, response, isCoupon):
+    def _get_html_content(self, response, is_coupon_deal):
         content_root = response.xpath('.//*[contains(@class, "entry-content")][1]')
 
         def should_start_after_this(element):
@@ -176,7 +185,7 @@ class BasicSpider(scrapy.Spider):
             if should_stop(node):
                 break
 
-            if isCoupon and should_skip(node):
+            if is_coupon_deal and should_skip(node):
                 continue
 
             html_content += node.extract()
