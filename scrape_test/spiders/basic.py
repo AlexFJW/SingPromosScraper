@@ -33,7 +33,9 @@ class BasicSpider(scrapy.Spider):
     allowed_domains = ["singpromos.com"]
     start_urls = UrlToCategoryMap.keys()
     # for debugging
-    #start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
+    # start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
+    '''start_urls = ['http://singpromos.com/department-stores/guardian-online-store-20-off-storewide-discount-coupon-code'
+                 '-no-min-spend-valid-from-18-21-may-2017-201892/']'''
 
     # for navigation pages (pages with a list of deals & a pagination bar for more deals)
     def parse(self, response):
@@ -62,7 +64,7 @@ class BasicSpider(scrapy.Spider):
             # make the ajax call & process the deal page's data at that url
             # cache this page's response body to do the above
 
-            deal_id = re.findall('-(\\d*?)/$', response.url)[-1]
+            deal_id = self.get_deal_id(response.url)
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
 
@@ -72,6 +74,10 @@ class BasicSpider(scrapy.Spider):
             yield request
         else:
             yield self.parse_regular_deal(response)
+
+    @staticmethod
+    def get_deal_id(url):
+        return re.findall('-(\\d*?)/$', url)[-1]
 
     def is_coupon_deal_page(self, response):
         return len(response.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
@@ -130,6 +136,7 @@ class BasicSpider(scrapy.Spider):
         loader.add_value('spider', self.name)
         loader.add_value('server', socket.gethostname())
         loader.add_value('time_retrieved_epoch', int(time.time()))
+        loader.add_value('deal_id', self.get_deal_id(start_url))
 
         loader.add_xpath("title", '//*[@class="entry-title"]//text()')
         loader.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
