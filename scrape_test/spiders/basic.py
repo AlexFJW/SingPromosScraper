@@ -55,7 +55,7 @@ class BasicSpider(scrapy.Spider):
     def parse_deal(self, response):
         logging.warning("HIHI")
         if self.is_coupon_deal_page(response):
-            deal_id = re.findall('-(\\d*?)/$', response.url)[-1]
+            deal_id = self.get_deal_id(response)
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
             request.meta["old_response_body"] = response.body
@@ -64,6 +64,10 @@ class BasicSpider(scrapy.Spider):
             yield request
         else:
             yield self.parse_regular_deal(response)
+
+    @staticmethod
+    def get_deal_id(response):
+        return re.findall('-(\\d*?)/$', response.url)[-1]
 
     def is_coupon_deal_page(self, response):
         return len(response.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
@@ -122,6 +126,7 @@ class BasicSpider(scrapy.Spider):
         loader.add_value('spider', self.name)
         loader.add_value('server', socket.gethostname())
         loader.add_value('time_retrieved_epoch', int(time.time()))
+        loader.add_value('deal_id', re.findall('-(\\d*?)/$', start_url)[-1])
 
         loader.add_xpath("title", '//*[@class="entry-title"]//text()')
         loader.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')

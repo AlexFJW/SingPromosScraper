@@ -20,6 +20,7 @@ class Deal(Item):
     location = Field()
     address = Field()
     image_urls = Field()
+    deal_id = Field()
 
     # initial url which led us to this page
     source_page = Field()
