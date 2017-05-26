@@ -31,9 +31,11 @@ def urls_to_categories(list_):
 class BasicSpider(scrapy.Spider):
     name = "basic"
     allowed_domains = ["singpromos.com"]
-    start_urls = UrlToCategoryMap.keys()
+    # start_urls = UrlToCategoryMap.keys()
     # for debugging
     # start_urls = ['http://singpromos.com/department-stores/bhg-20-off-storewide-super-sale-from-13-15-may-2016-178949/']
+    '''start_urls = ['http://singpromos.com/department-stores/guardian-online-store-20-off-storewide-discount-coupon-code'
+                 '-no-min-spend-valid-from-18-21-may-2017-201892/']'''
 
     def parse(self, response):
         self._set_start_url(response)
@@ -55,7 +57,7 @@ class BasicSpider(scrapy.Spider):
     def parse_deal(self, response):
         logging.warning("HIHI")
         if self.is_coupon_deal_page(response):
-            deal_id = self.get_deal_id(response)
+            deal_id = self.get_deal_id(response.url)
             coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
             request = Request(url=coupon_url, callback=self.parse_coupon_deal)
             request.meta["old_response_body"] = response.body
@@ -66,8 +68,8 @@ class BasicSpider(scrapy.Spider):
             yield self.parse_regular_deal(response)
 
     @staticmethod
-    def get_deal_id(response):
-        return re.findall('-(\\d*?)/$', response.url)[-1]
+    def get_deal_id(URL):
+        return re.findall('-(\\d*?)/$', URL)[-1]
 
     def is_coupon_deal_page(self, response):
         return len(response.xpath('.//*[contains(@onclick, "showCouponLinkAjax")]')) > 0
@@ -126,7 +128,7 @@ class BasicSpider(scrapy.Spider):
         loader.add_value('spider', self.name)
         loader.add_value('server', socket.gethostname())
         loader.add_value('time_retrieved_epoch', int(time.time()))
-        loader.add_value('deal_id', re.findall('-(\\d*?)/$', start_url)[-1])
+        loader.add_value('deal_id', self.get_deal_id(start_url))
 
         loader.add_xpath("title", '//*[@class="entry-title"]//text()')
         loader.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
