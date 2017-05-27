@@ -90,7 +90,7 @@ class BasicSpider(scrapy.Spider):
         old_response = Selector(text=response.meta["old_response_body"])
         loader = DealLoader(item=Deal(), selector=old_response)
 
-        # load common data
+        # save common data
         self.add_common_data_to_loader(loader, response.meta["start_url"])
 
         prev_url = response.meta["prev_url"]
@@ -116,15 +116,15 @@ class BasicSpider(scrapy.Spider):
     def parse_regular_deal(self, response):
         loader = DealLoader(item=Deal(), response=response)
 
-        # load common data
+        # save common data
         self.add_common_data_to_loader(loader, response.meta["start_url"])
         loader.add_value('page_url', response.url)
 
-        # load html content
+        # save html content
         html_content = self._get_html_content(response, False)
         loader.add_value("html_content", html_content)
 
-        # load images
+        # save images
         def make_url(i): return urllib.parse.urljoin(response.url, i)
         image_urls = Selector(text=html_content).xpath('//a/img/../@href').extract()
         loader.add_value("image_urls", image_urls, MapCompose(make_url))
