@@ -49,7 +49,7 @@ class BasicSpider(scrapy.Spider):
         # save the start_url. used to verify the category of each deal
         self._set_start_url(response)
 
-        if response.url in self.bad_start_urls:
+        if len(self.start_urls & self.bad_start_urls) != 0:
             return
         else:
             # handle next navigation page
@@ -70,7 +70,7 @@ class BasicSpider(scrapy.Spider):
 
     def parse_deal(self, response):
         if self._timestamp_too_old(response):
-            self.bad_start_urls.add(response.url)
+            self.bad_start_urls.add(response.meta["start_url"])
 
         else:
             if self.is_coupon_deal_page(response):
@@ -213,7 +213,7 @@ class BasicSpider(scrapy.Spider):
     def _timestamp_too_old(self, response): # comment out when doing first scrape
         deal_published_date = self.get_deal_published_date(response)
         deal_published_date_in_seconds = dateutil.parser.parse(deal_published_date).timestamp()
-        logging.log(logging.DEBUG, "" + str(deal_published_date_in_seconds))
+        # logging.log(logging.DEBUG, "" + str(deal_published_date_in_seconds))
 
         two_days_in_seconds = 60*60*24*2
 
@@ -224,5 +224,5 @@ class BasicSpider(scrapy.Spider):
 
     def get_deal_published_date(self, response):
         date = response.xpath('.//*[contains(@name, "article:published_time")]/@content').extract_first() #string
-        logging.log(logging.DEBUG, "DEAL PUBLISHED DATE: " + date)
+        # logging.log(logging.DEBUG, "DEAL PUBLISHED DATE: " + date)
         return date
