@@ -13,7 +13,7 @@ BOT_NAME = 'scrape_test'
 
 SPIDER_MODULES = ['scrape_test.spiders']
 NEWSPIDER_MODULE = 'scrape_test.spiders'
-CLOSESPIDER_PAGECOUNT = 6000
+CLOSESPIDER_PAGECOUNT = 50 # crawl number of pages
 
 DEPTH_LIMIT = 150
 
