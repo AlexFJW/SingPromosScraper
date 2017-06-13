@@ -28,6 +28,7 @@ class Deal(Item):
     # should be a human-readable string
     deal_start_date = Field()
     deal_end_date = Field()
+    deal_published_date = Field()
 
     # Housekeeping
     page_url = Field()

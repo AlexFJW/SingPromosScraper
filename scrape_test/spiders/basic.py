@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import calendar
+
+import dateutil.parser
 import scrapy
 import time
 import socket
@@ -6,6 +9,8 @@ import re
 import logging
 import json
 import urllib.parse
+
+from datetime import date
 from scrapy.selector import Selector
 from scrapy.loader.processors import MapCompose, Compose
 from scrapy.http import Request
@@ -37,43 +42,52 @@ class BasicSpider(scrapy.Spider):
     '''start_urls = ['http://singpromos.com/department-stores/guardian-online-store-20-off-storewide-discount-coupon-code'
                  '-no-min-spend-valid-from-18-21-may-2017-201892/']'''
 
+    bad_start_urls = set()
+
     # for navigation pages (pages with a list of deals & a pagination bar for more deals)
     def parse(self, response):
         # save the start_url. used to verify the category of each deal
         self._set_start_url(response)
 
-        # handle all deals
-        deal_urls = response.xpath('.//*[@class="tabs1Content"]//*[contains(@class, "mh-loop-title")]/a/@href').extract()
-        for url in deal_urls:
-            full_url = urllib.parse.urljoin(response.url, url)
-            request = Request(url=full_url, callback=self.parse_deal)
-            request.meta["start_url"] = response.meta["start_url"]
-            yield request
+        if len(self.start_urls & self.bad_start_urls) != 0:
+            return
+        else:
+            # handle next navigation page
+            next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
+            if next_page_url:
+                full_url = urllib.parse.urljoin(response.url, next_page_url[0])
+                request = Request(url=full_url, callback=self.parse)
+                request.meta["start_url"] = response.meta["start_url"]
+                yield request
 
-        # handle next navigation page
-        next_page_url = response.xpath('.//*[@class="next page-numbers"]/@href').extract()
-        if next_page_url:
-            full_url = urllib.parse.urljoin(response.url, next_page_url[0])
-            request = Request(url=full_url, callback=self.parse)
-            request.meta["start_url"] = response.meta["start_url"]
-            yield request
+            # handle all deals
+            deal_urls = response.xpath('.//*[@class="tabs1Content"]//*[contains(@class, "mh-loop-title")]/a/@href').extract()
+            for url in deal_urls:
+                full_url = urllib.parse.urljoin(response.url, url)
+                request = Request(url=full_url, callback=self.parse_deal)
+                request.meta["start_url"] = response.meta["start_url"]
+                yield request
 
     def parse_deal(self, response):
-        if self.is_coupon_deal_page(response):
-            # coupon deal pages retrieve the coupon code through a ajax call
-            # make the ajax call & process the deal page's data at that url
-            # cache this page's response body to do the above
+        if self._timestamp_too_old(response):
+            self.bad_start_urls.add(response.meta["start_url"])
 
-            deal_id = self.get_deal_id(response.url)
-            coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
-            request = Request(url=coupon_url, callback=self.parse_coupon_deal)
-
-            request.meta["old_response_body"] = response.body
-            request.meta["start_url"] = response.meta["start_url"]
-            request.meta["prev_url"] = response.url
-            yield request
         else:
-            yield self.parse_regular_deal(response)
+            if self.is_coupon_deal_page(response):
+                # coupon deal pages retrieve the coupon code through a ajax call
+                # make the ajax call & process the deal page's data at that url
+                # cache this page's response body to do the above
+
+                deal_id = "singpromos_" + self.get_deal_id(response.url)
+                coupon_url = "http://singpromos.com/getcoupon/" + deal_id + "/"
+                request = Request(url=coupon_url, callback=self.parse_coupon_deal)
+
+                request.meta["old_response_body"] = response.body
+                request.meta["start_url"] = response.meta["start_url"]
+                request.meta["prev_url"] = response.url
+                yield request
+            else:
+                yield self.parse_regular_deal(response)
 
     @staticmethod
     def get_deal_id(url):
@@ -90,11 +104,11 @@ class BasicSpider(scrapy.Spider):
         old_response = Selector(text=response.meta["old_response_body"])
         loader = DealLoader(item=Deal(), selector=old_response)
 
-        # save common data
-        self.add_common_data_to_loader(loader, response.meta["start_url"])
-
         prev_url = response.meta["prev_url"]
         loader.add_value('page_url', prev_url)
+
+        # load common data
+        self.add_common_data_to_loader(loader, response.meta["start_url"], prev_url)
 
         # read the coupon code
         str_response = str(response.body, 'utf-8')
@@ -105,6 +119,8 @@ class BasicSpider(scrapy.Spider):
         html_content = self._get_html_content(old_response, True)
         html_content = html_content.replace("(click box above to reveal)", coupon_code)
         loader.add_value("html_content", html_content)
+
+        loader.add_value("deal_published_date", self.get_deal_published_date(response))
 
         # save images
         def make_url(i): return urllib.parse.urljoin(prev_url, i)
@@ -117,12 +133,14 @@ class BasicSpider(scrapy.Spider):
         loader = DealLoader(item=Deal(), response=response)
 
         # save common data
-        self.add_common_data_to_loader(loader, response.meta["start_url"])
+        self.add_common_data_to_loader(loader, response.meta["start_url"], response.url)
         loader.add_value('page_url', response.url)
 
         # save html content
         html_content = self._get_html_content(response, False)
         loader.add_value("html_content", html_content)
+
+        loader.add_value("deal_published_date", self.get_deal_published_date(response))
 
         # save images
         def make_url(i): return urllib.parse.urljoin(response.url, i)
@@ -131,12 +149,12 @@ class BasicSpider(scrapy.Spider):
 
         return loader.load_item()
 
-    def add_common_data_to_loader(self, loader, start_url):
+    def add_common_data_to_loader(self, loader, start_url, url):
         loader.add_value('project', self.settings.get('BOT_NAME'))
         loader.add_value('spider', self.name)
         loader.add_value('server', socket.gethostname())
         loader.add_value('time_retrieved_epoch', int(time.time()))
-        loader.add_value('deal_id', self.get_deal_id(start_url))
+        loader.add_value('deal_id', "singpromos_" + self.get_deal_id(url))
 
         loader.add_xpath("title", '//*[@class="entry-title"]//text()')
         loader.add_xpath("preview_image_url", '//*[@class="entry-thumbnail"]//img[1]/@src')
@@ -191,3 +209,20 @@ class BasicSpider(scrapy.Spider):
             html_content += node.extract()
 
         return html_content.replace("/redirect/link?url=", "")
+
+    def _timestamp_too_old(self, response): # comment out when doing first scrape
+        deal_published_date = self.get_deal_published_date(response)
+        deal_published_date_in_seconds = dateutil.parser.parse(deal_published_date).timestamp()
+        # logging.log(logging.DEBUG, "" + str(deal_published_date_in_seconds))
+
+        two_days_in_seconds = 60*60*24*2
+
+        if int(time.time()) - int(deal_published_date_in_seconds) >=  two_days_in_seconds: #2 days in seconds
+           return True
+        else:
+            return False
+
+    def get_deal_published_date(self, response):
+        date = response.xpath('.//*[contains(@name, "article:published_time")]/@content').extract_first() #string
+        # logging.log(logging.DEBUG, "DEAL PUBLISHED DATE: " + date)
+        return date
