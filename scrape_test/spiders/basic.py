@@ -132,17 +132,17 @@ class BasicSpider(scrapy.Spider):
     def parse_regular_deal(self, response):
         loader = DealLoader(item=Deal(), response=response)
 
-        # load common data
+        # save common data
         self.add_common_data_to_loader(loader, response.meta["start_url"], response.url)
         loader.add_value('page_url', response.url)
 
-        # load html content
+        # save html content
         html_content = self._get_html_content(response, False)
         loader.add_value("html_content", html_content)
 
         loader.add_value("deal_published_date", self.get_deal_published_date(response))
 
-        # load images
+        # save images
         def make_url(i): return urllib.parse.urljoin(response.url, i)
         image_urls = Selector(text=html_content).xpath('//a/img/../@href').extract()
         loader.add_value("image_urls", image_urls, MapCompose(make_url))
